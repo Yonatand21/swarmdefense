@@ -1,0 +1,66 @@
+# Canonical scenarios -- the argument and the demo's spine (ARCHITECTURE_AND_PLAN.md §9).
+# Phase 0 only needs one to run end-to-end; all three are defined here as pure data.
+
+scenarios:
+  - name: all_ew_vs_autonomous
+    description: >
+      All-EW defense vs an autonomous (GPS-denied) swarm. Soft-kill immunity plus late detection
+      means the cheap defense does almost nothing -> catastrophic leak. (§9.1)
+    seed: 0
+    approach_distance: 60
+    swarm:
+      - threat: autonomous
+        count: 30
+    defense:
+      sensor:
+        p_track: 0.95
+        p_identify: 0.9
+      effectors:
+        - ew
+    environment:
+      detection_modifier: 1.0
+
+  - name: kinetic_vs_mass_and_decoys
+    description: >
+      Kinetic-heavy defense vs cheap mass plus decoys. You "win" tactically but lose on
+      cost-exchange and run the magazine dry, leaking the back half of the wave. (§9.2)
+    seed: 0
+    approach_distance: 60
+    swarm:
+      - threat: shahed
+        count: 24
+      - threat: decoy
+        count: 12
+    defense:
+      sensor:
+        p_track: 0.95
+        p_identify: 0.85
+      effectors:
+        - kinetic
+    environment:
+      detection_modifier: 1.0
+
+  - name: layered_mix
+    description: >
+      Layered defense (EW + interceptor drones + directed energy) vs a heterogeneous wave. Cheap
+      layers absorb mass; expensive shots are reserved for what needs them. The sustainable answer.
+      (§9.3)
+    seed: 0
+    approach_distance: 60
+    swarm:
+      - threat: shahed
+        count: 18
+      - threat: decoy
+        count: 10
+      - threat: autonomous
+        count: 8
+    defense:
+      sensor:
+        p_track: 0.95
+        p_identify: 0.85
+      effectors:
+        - ew
+        - interceptor_drone
+        - directed_energy
+    environment:
+      detection_modifier: 1.0

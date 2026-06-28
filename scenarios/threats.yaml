@@ -1,0 +1,31 @@
+# Threat archetypes (data-driven; ARCHITECTURE_AND_PLAN.md §6).
+# Numbers are order-of-magnitude from open sources -- illustrative, not precise (§11).
+# detection_range is in abstract length-units; small => "seen too late".
+
+threats:
+  - id: shahed
+    category: cheap_mass
+    cost: 25000
+    speed: 2.0
+    detection_range: 35
+    soft_kill_immune: false
+    is_decoy: false
+    warhead: 1.0
+
+  - id: decoy
+    category: decoy
+    cost: 4000
+    speed: 2.0
+    detection_range: 35
+    soft_kill_immune: false
+    is_decoy: true
+    warhead: 0.0
+
+  - id: autonomous
+    category: autonomous
+    cost: 30000
+    speed: 2.5
+    detection_range: 10
+    soft_kill_immune: true
+    is_decoy: false
+    warhead: 1.0

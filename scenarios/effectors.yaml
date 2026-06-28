@@ -1,0 +1,38 @@
+# Effector archetypes (data-driven; ARCHITECTURE_AND_PLAN.md §6).
+# cost_per_shot is where the cost-exchange trap lives. Numbers are illustrative (§11).
+
+effectors:
+  - id: ew
+    type: soft_kill
+    cost_per_shot: 100
+    range: 30
+    magazine: 1000
+    reload_time: 0
+    p_kill: 0.7
+    # engages defaults to all categories; soft_kill is simply ignored vs soft_kill_immune threats.
+
+  - id: kinetic
+    type: kinetic
+    cost_per_shot: 1500000
+    range: 28
+    magazine: 8
+    reload_time: 6
+    p_kill: 0.9
+
+  - id: interceptor_drone
+    type: interceptor_drone
+    cost_per_shot: 30000
+    range: 22
+    magazine: 12
+    reload_time: 4
+    p_kill: 0.75
+
+  - id: directed_energy
+    type: directed_energy
+    cost_per_shot: 50
+    range: 12
+    magazine: 9999
+    reload_time: 0
+    p_kill: 0.6
+    max_simultaneous: 1
+    max_target_speed: 2.2
