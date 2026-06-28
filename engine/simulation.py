@@ -14,6 +14,7 @@ from engine.models import (
 )
 from engine.rng import SeededRng
 from schema.result import (
+    EffectorFrame,
     Frame,
     Metrics,
     Result,
@@ -114,6 +115,7 @@ def simulate(scenario: Scenario) -> Result:
             Frame(
                 tick=tick,
                 threats=[_frame_for(t) for t in threats],
+                effectors=[_effector_frame_for(e) for e in effectors],
                 shots=shots,
                 kills=kills,
                 leaks=leaks,
@@ -162,4 +164,12 @@ def _frame_for(t: ThreatState) -> ThreatFrame:
         position=t.position,
         alive=t.alive,
         tracked=t.tracked,
+    )
+
+
+def _effector_frame_for(e: EffectorState) -> EffectorFrame:
+    return EffectorFrame(
+        effector_id=e.spec.id,
+        ammo=e.ammo,
+        reloading=e.cooldown > 0,
     )

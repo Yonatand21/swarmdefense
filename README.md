@@ -4,8 +4,9 @@ A simulation sandbox that demonstrates *cost and saturation* -- not lethality --
 counter-drone fight. See [`ARCHITECTURE_AND_PLAN.md`](ARCHITECTURE_AND_PLAN.md) for the full thesis,
 design, and roadmap.
 
-> Status: **Phase 0 (walking skeleton)** -- the headless deterministic engine runs end-to-end and
-> emits the result contract. No UI yet (Phase 3).
+> Status: **Phase 1 (analysis core)** -- headless deterministic engine plus Monte Carlo
+> aggregation, distribution metrics, attrition curve, and magazine timeline. The three canonical
+> scenarios are validated numerically. No UI yet (Phase 3).
 
 ## Quickstart
 
@@ -15,10 +16,11 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 
 python cli.py --list                  # show the canonical scenarios
-python cli.py layered_mix             # run one deterministically, print the summary
-python cli.py layered_mix --emit      # also write outputs/<name>.result.json (the contract)
+python cli.py layered_mix             # one deterministic run, print the summary
+python cli.py layered_mix --runs 500  # Monte Carlo: distributions + curves + representative run
+python cli.py layered_mix --runs 500 --emit   # also write outputs/<name>.montecarlo.json
 
-pytest                                # determinism + conservation checks
+pytest                                # determinism, conservation, canonical validation
 ```
 
 ## Layout
