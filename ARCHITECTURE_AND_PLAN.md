@@ -288,8 +288,13 @@ Articulating this is explicitly graded. Each cut is a conscious trade, not an om
 - **No networked C2 / operator-latency modeling.** Assume instantaneous assignment. *Why:* real and
   important (decision speed is a documented bottleneck), but a clean knob to add later, not core to
   the proof.
-- **No server / database / accounts / multiplayer.** Local, single session, file-based contract.
-  *Why:* infrastructure is scale, and scale is deferred (§12).
+- **No database / accounts / multiplayer / deployment.** Local, single session.
+  *Why:* persistence and accounts are scale, and scale is deferred (§12).
+  *Amended:* a **thin local run-bridge** (a localhost FastAPI process that validates a scenario and
+  returns its Monte Carlo result) is now in scope — see the §12 note below. It is the input surface
+  that turns the tool from a preset-viewer into something an *operator* uses (compose a swarm + a
+  defense loadout, run, compare). It is stateless, local-only, and adds no database/auth/deploy; the
+  file-based contract still works headless via the CLI.
 - **Numbers are order-of-magnitude from open sources**, illustrative, not precise or classified.
 
 ---
@@ -307,10 +312,23 @@ discipline: **design the seams, defer the scale.**
 - A separated **assignment-policy module** — swap the simple policy for an optimizer later, untouched
   engine.
 
-**Explicitly deferred (the over-engineering trap — not now):**
-- Web server / message queue / database / auth / multiplayer.
-- Plugin architecture, distributed compute.
-- Live re-run interactivity (replay-from-trace first; live tweak-and-rerun is next-week).
+**Amended into scope — interactive mission configuration (the operator loop):**
+The original plan deferred "live tweak-and-rerun" and assumed a purely file-based contract. In
+practice, picking among three saved presets does not let an operator *reason* — the value is in
+composing a mission (swarm mix + counts + approach) against a posture (effector loadout, magazines,
+ranges, sensor) and seeing the outcome distribution. Because the engine is already fully
+data-driven and a 500× batch runs in well under a second, the cost of a thin local bridge is low and
+the payoff is the actual product. So this is now baked in, deliberately:
+- A **localhost FastAPI bridge** exposing `GET /catalog` (threat/effector building blocks + presets)
+  and `POST /run` (a validated `Scenario` in, a `MonteCarloResult` out). The engine is unchanged; the
+  bridge is just another consumer of the same contract.
+- A **mission builder UI** with a simple view (pick archetypes, counts, loadout) and an advanced
+  panel (edit any numeric field), per A/B column, with a Run button.
+
+**Still explicitly deferred (the over-engineering trap — not now):**
+- Database / auth / accounts / multiplayer / hosted deployment.
+- Plugin architecture, distributed compute, message queues.
+- Saving/sharing built missions across sessions (in-memory only for now).
 
 **The "another week" roadmap (falls straight out of the cuts):**
 - Smarter shot-allocation under saturation (the real C2 optimization problem).
@@ -329,7 +347,10 @@ service — without ever touching the simulation logic.*
 
 **Stack:** Python 3.11+ engine (chosen for analysis fit and integration with existing tooling);
 pydantic v2 for the result contract and config validation; a thin CLI to run scenarios and emit
-JSON. The frontend is **React + TypeScript + Vite**: React owns the application shell (scenario
+JSON, plus a thin **localhost FastAPI bridge** (`GET /catalog`, `POST /run`) that lets the UI
+compose and run missions live — a stateless consumer of the same contract, not infrastructure (see
+§11/§12 amendment). The frontend is **React + TypeScript + Vite**: React owns the application shell
+(mission builder, scenario
 config, metrics dashboard, A/B comparison, controls) for its component model and growing-state
 scalability; the result contract is mirrored as shared TS types so the seam is type-checked on the
 consumer side. The 2D animation is a single `<EngagementCanvas>` component that drops to imperative
@@ -357,6 +378,7 @@ swarm-sandbox/
   schema/
     result.py              # pydantic: RunTrace, Metrics, Result (the contract)
     loader.py              # YAML -> pydantic: parse/validate threats, effectors, scenarios
+  server.py                # thin localhost FastAPI bridge: GET /catalog, POST /run
   scenarios/               # data-driven definitions
     threats.yaml
     effectors.yaml

@@ -1,7 +1,9 @@
-"""Thin CLI: run a scenario deterministically and print / emit the Result (the contract).
+"""Thin CLI: run scenarios deterministically and print / emit the contract.
 
-Phase 0 scope (ARCHITECTURE_AND_PLAN.md §10): one deterministic run printing a result object.
-Monte Carlo aggregation and the metrics dashboard arrive in Phase 1/2.
+- single run  : print a Result, optionally emit JSON (Phase 0)
+- --runs N    : Monte Carlo aggregation, print distribution summary (Phase 1)
+- --all       : emit every canonical scenario's Monte Carlo JSON + a manifest for the dashboard,
+                which reads them statically -- no server (Phase 2; honors §11/§12).
 """
 
 from __future__ import annotations
@@ -15,7 +17,9 @@ from engine.simulation import simulate
 from schema.loader import DEFAULT_SCENARIO_DIR, load_scenario, load_scenarios
 from schema.result import MonteCarloResult, Result
 
-OUTPUT_DIR = Path(__file__).resolve().parent / "outputs"
+ROOT = Path(__file__).resolve().parent
+OUTPUT_DIR = ROOT / "outputs"
+DASHBOARD_DATA_DIR = ROOT / "frontend" / "public" / "data"
 
 
 def _fmt_money(value: float) -> str:
@@ -86,7 +90,23 @@ def main(argv: list[str] | None = None) -> int:
         help="Directory containing threats/effectors/scenarios YAML.",
     )
     parser.add_argument("--emit", action="store_true", help="Write the result JSON to outputs/.")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Export every scenario's Monte Carlo JSON + manifest for the dashboard.",
+    )
+    parser.add_argument(
+        "--out-dir",
+        default=None,
+        help=f"Where --all / --emit write JSON (default for --all: {DASHBOARD_DATA_DIR}).",
+    )
     args = parser.parse_args(argv)
+
+    if args.all:
+        runs = args.runs if args.runs > 1 else DEFAULT_RUNS
+        out_dir = Path(args.out_dir) if args.out_dir else DASHBOARD_DATA_DIR
+        _export_all(load_scenarios(args.scenario_dir), runs, out_dir)
+        return 0
 
     if args.list or not args.scenario:
         scenarios = load_scenarios(args.scenario_dir)
@@ -120,6 +140,30 @@ def _emit(filename: str, payload: str) -> None:
     out_path = OUTPUT_DIR / filename
     out_path.write_text(payload, encoding="utf-8")
     print(f"Wrote {out_path}")
+
+
+def _export_all(scenarios, runs: int, out_dir: Path) -> None:
+    """Run every scenario at `runs`x and write JSON + a manifest the dashboard loads statically."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    manifest = []
+    for name, scenario in scenarios.items():
+        mc = run_montecarlo(scenario, runs=runs)
+        filename = f"{name}.montecarlo.json"
+        (out_dir / filename).write_text(mc.model_dump_json(indent=2), encoding="utf-8")
+        manifest.append(
+            {
+                "name": name,
+                "description": scenario.description.strip(),
+                "file": filename,
+                "runs": runs,
+            }
+        )
+        print(f"  {name}: median leakers {mc.metrics.leakers_total.median:g}, "
+              f"exchange {mc.metrics.cost_exchange_ratio.median:.2f}x")
+    (out_dir / "index.json").write_text(
+        json.dumps({"scenarios": manifest}, indent=2), encoding="utf-8"
+    )
+    print(f"Wrote {len(manifest)} scenarios + index.json to {out_dir}")
 
 
 if __name__ == "__main__":
