@@ -69,15 +69,16 @@ def _build_scenario(
     effectors: dict[str, EffectorSpec],
 ) -> Scenario:
     swarm = [
-        SwarmEntry(spec=_resolve(threats, item["threat"], "threat"), count=item["count"])
+        SwarmEntry(
+            spec=_resolve_threat(item["threat"], threats),
+            count=item["count"],
+        )
         for item in entry["swarm"]
     ]
 
     defense_raw = entry["defense"]
     sensor = SensorSpec(**defense_raw.get("sensor", {}))
-    defense_effectors = [
-        _resolve(effectors, eid, "effector") for eid in defense_raw["effectors"]
-    ]
+    defense_effectors = [_resolve_effector(e, effectors) for e in defense_raw["effectors"]]
     defense = DefenseSpec(sensor=sensor, effectors=defense_effectors)
 
     environment = Environment(**entry.get("environment", {}))
@@ -91,6 +92,35 @@ def _build_scenario(
         defense=defense,
         environment=environment,
     )
+
+
+def _resolve_threat(item: Any, threats: dict[str, ThreatSpec]) -> ThreatSpec:
+    """A swarm `threat` is an id string, or a dict {id, ...field overrides}."""
+    base, overrides = _split_ref(item, "threat")
+    spec = _resolve(threats, base, "threat")
+    if not overrides:
+        return spec
+    return ThreatSpec(**{**spec.model_dump(), **overrides})
+
+
+def _resolve_effector(item: Any, effectors: dict[str, EffectorSpec]) -> EffectorSpec:
+    """A defense effector is an id string, or a dict {id, ...field overrides}."""
+    base, overrides = _split_ref(item, "effector")
+    spec = _resolve(effectors, base, "effector")
+    if not overrides:
+        return spec
+    return EffectorSpec(**{**spec.model_dump(), **overrides})
+
+
+def _split_ref(item: Any, kind: str) -> tuple[str, dict[str, Any]]:
+    """Normalize an id-string-or-override-dict into (id, overrides)."""
+    if isinstance(item, str):
+        return item, {}
+    if isinstance(item, dict):
+        if "id" not in item:
+            raise KeyError(f"{kind} override must include an 'id'. Got: {item!r}")
+        return item["id"], {k: v for k, v in item.items() if k != "id"}
+    raise TypeError(f"{kind} entry must be a string id or a dict with 'id'. Got: {item!r}")
 
 
 def _resolve(registry: dict[str, Any], key: str, kind: str) -> Any:

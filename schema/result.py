@@ -165,6 +165,8 @@ class MonteCarloResult(BaseModel):
     scenario_name: str
     runs: int
     base_seed: int
+    total_threats: int
+    armed_threats: int
     metrics: MonteCarloMetrics
     attrition_curve: list[AttritionPoint]
     magazine_timeline: list[MagazineStat]

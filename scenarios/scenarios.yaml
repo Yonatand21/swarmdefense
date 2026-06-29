@@ -59,8 +59,17 @@ scenarios:
         p_track: 0.95
         p_identify: 0.85
       effectors:
-        - ew
-        - interceptor_drone
-        - directed_energy
+        # Cheap area jammer soaks the mass (it cannot touch the EW-immune autonomous).
+        - id: ew
+          max_simultaneous: 6
+        # Close-in mop-up of any cheap-mass leakers EW misses.
+        - id: directed_energy
+          max_simultaneous: 2
+        # Expensive interceptors RESERVED for the hard target the cheap layers can't kill.
+        - id: interceptor_drone
+          engages: [autonomous]
+          magazine: 16
+          max_simultaneous: 4
+          p_kill: 0.8
     environment:
       detection_modifier: 1.0

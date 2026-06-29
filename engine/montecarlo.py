@@ -56,10 +56,15 @@ def run_montecarlo(
     representative_seed = _representative_seed(summaries)
     representative = _representative_trace(scenario, representative_seed)
 
+    total_threats = sum(e.count for e in scenario.swarm)
+    armed_threats = sum(e.count for e in scenario.swarm if not e.spec.is_decoy)
+
     return MonteCarloResult(
         scenario_name=scenario.name,
         runs=runs,
         base_seed=base,
+        total_threats=total_threats,
+        armed_threats=armed_threats,
         metrics=metrics,
         attrition_curve=attrition,
         magazine_timeline=magazine,
