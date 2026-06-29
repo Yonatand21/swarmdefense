@@ -36,6 +36,7 @@ class _RunSummary:
     metrics: Metrics
     alive_series: list[int]
     dry_ticks: dict[str, Optional[int]]
+    shots_by_effector: dict[str, int]
 
 
 def run_montecarlo(
@@ -49,7 +50,8 @@ def run_montecarlo(
 
     summaries = [_run_one(scenario, base + i) for i in range(runs)]
 
-    metrics = _aggregate_metrics(summaries)
+    effector_ids = [e.id for e in scenario.defense.effectors]
+    metrics = _aggregate_metrics(summaries, effector_ids)
     attrition = _attrition_curve(summaries, runs)
     magazine = _magazine_timeline(scenario, summaries, runs)
 
@@ -77,7 +79,17 @@ def _run_one(scenario: Scenario, seed: int) -> _RunSummary:
     result = simulate(scenario.model_copy(update={"seed": seed}))
     alive_series = [sum(1 for t in frame.threats if t.alive) for frame in result.trace.frames]
     dry_ticks = _first_dry_ticks(result.trace)
-    return _RunSummary(seed=seed, metrics=result.metrics, alive_series=alive_series, dry_ticks=dry_ticks)
+    shots_by_effector: dict[str, int] = {}
+    for frame in result.trace.frames:
+        for shot in frame.shots:
+            shots_by_effector[shot.effector_id] = shots_by_effector.get(shot.effector_id, 0) + 1
+    return _RunSummary(
+        seed=seed,
+        metrics=result.metrics,
+        alive_series=alive_series,
+        dry_ticks=dry_ticks,
+        shots_by_effector=shots_by_effector,
+    )
 
 
 def _first_dry_ticks(trace: RunTrace) -> dict[str, Optional[int]]:
@@ -92,9 +104,14 @@ def _first_dry_ticks(trace: RunTrace) -> dict[str, Optional[int]]:
     return first
 
 
-def _aggregate_metrics(summaries: list[_RunSummary]) -> MonteCarloMetrics:
+def _aggregate_metrics(summaries: list[_RunSummary], effector_ids: list[str]) -> MonteCarloMetrics:
     def col(getter) -> Distribution:
         return Distribution.from_values([float(getter(s.metrics)) for s in summaries])
+
+    shots_by_effector = {
+        eid: Distribution.from_values([float(s.shots_by_effector.get(eid, 0)) for s in summaries])
+        for eid in effector_ids
+    }
 
     return MonteCarloMetrics(
         leakers_total=col(lambda m: m.leakers_total),
@@ -105,6 +122,7 @@ def _aggregate_metrics(summaries: list[_RunSummary]) -> MonteCarloMetrics:
         defender_cost=col(lambda m: m.defender_cost),
         damage_to_asset=col(lambda m: m.damage_to_asset),
         shots_fired=col(lambda m: m.shots_fired),
+        shots_by_effector=shots_by_effector,
     )
 
 

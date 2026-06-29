@@ -29,3 +29,6 @@ frontend/dist/
 
 # Generated dashboard data (derived from the engine; regenerate with: python cli.py --all)
 frontend/public/data/
+
+# Local-only internal docs / tracking (never pushed)
+docs/

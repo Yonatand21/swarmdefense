@@ -32,3 +32,7 @@ packages = ["engine", "schema"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: deliberately slow tests (real engine, large sweeps)",
+    "integration: end-to-end tests that exercise the real engine",
+]

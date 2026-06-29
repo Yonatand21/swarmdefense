@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from engine.models import EffectorSpec, Scenario, ThreatSpec
 from engine.montecarlo import run_montecarlo
+from engine.requirements import solve
 from schema.loader import (
     DEFAULT_SCENARIO_DIR,
     load_effectors,
@@ -20,6 +21,7 @@ from schema.loader import (
     load_threats,
 )
 from schema.result import MonteCarloResult
+from schema.solver import Requirement, SolverResult
 
 try:
     from fastapi import FastAPI, HTTPException
@@ -43,6 +45,14 @@ class Catalog(BaseModel):
 
 class RunRequest(BaseModel):
     scenario: Scenario
+    runs: int = Field(default=200, ge=1, le=MAX_RUNS)
+
+
+class SolveRequest(BaseModel):
+    """Inverse design: hold the swarm/approach from `scenario`, search postures to meet `requirement`."""
+
+    scenario: Scenario
+    requirement: Requirement
     runs: int = Field(default=200, ge=1, le=MAX_RUNS)
 
 
@@ -76,6 +86,22 @@ def post_run(req: RunRequest) -> MonteCarloResult:
     if not req.scenario.defense.effectors:
         raise HTTPException(status_code=422, detail="Defense is empty: add at least one effector.")
     return run_montecarlo(req.scenario, runs=req.runs)
+
+
+@app.post("/api/requirements", response_model=SolverResult)
+def post_requirements(req: SolveRequest) -> SolverResult:
+    """Find the cheapest pre-registered posture that meets the requirement for this threat picture."""
+    if not req.scenario.swarm:
+        raise HTTPException(status_code=422, detail="Swarm is empty: add at least one threat.")
+    catalog = load_effectors(DEFAULT_SCENARIO_DIR / "effectors.yaml")
+    return solve(
+        req.scenario.swarm,
+        req.scenario.approach_distance,
+        req.requirement,
+        catalog,
+        base_seed=req.scenario.seed,
+        runs=req.runs,
+    )
 
 
 if __name__ == "__main__":

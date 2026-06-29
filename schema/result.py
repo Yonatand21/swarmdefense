@@ -15,6 +15,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, computed_field
 
+from engine.models import DefenseSpec
+
 
 class ShotRecord(BaseModel):
     """One effector engagement in one tick."""
@@ -140,6 +142,10 @@ class MonteCarloMetrics(BaseModel):
     defender_cost: Distribution
     damage_to_asset: Distribution
     shots_fired: Distribution
+    shots_by_effector: dict[str, Distribution] = Field(
+        default_factory=dict,
+        description="Expected rounds consumed per wave, per effector -- feeds the logistics ledger.",
+    )
 
 
 class AttritionPoint(BaseModel):
@@ -173,6 +179,29 @@ class MonteCarloResult(BaseModel):
     representative_seed: int
     representative: RunTrace
 
+    # Flat read-accessors so any consumer (e.g. the requirements solver, or a synthetic test
+    # evaluator) can read headline numbers without reaching into nested distributions.
+    @property
+    def p90_armed_leakers(self) -> float:
+        return self.metrics.leakers_armed.p90
+
+    @property
+    def p50_armed_leakers(self) -> float:
+        return self.metrics.leakers_armed.median
+
+    @property
+    def cost_exchange_ratio(self) -> float:
+        return self.metrics.cost_exchange_ratio.median
+
+    @property
+    def leak_fraction(self) -> float:
+        return self.metrics.leakers_armed.p90 / self.armed_threats if self.armed_threats else 0.0
+
+    @property
+    def consumption_per_wave(self) -> dict[str, float]:
+        """Expected rounds expended per wave, per effector -- the ledger's burn rate."""
+        return {eid: d.mean for eid, d in self.metrics.shots_by_effector.items()}
+
 
 def _percentile(ordered: list[float], q: float) -> float:
     """Linear-interpolation percentile on an already-sorted list."""
@@ -186,3 +215,68 @@ def _percentile(ordered: list[float], q: float) -> float:
     if lo == hi:
         return ordered[lo]
     return ordered[lo] + (ordered[hi] - ordered[lo]) * (pos - lo)
+
+
+# --------------------------------------------------------------------------------------------------
+# Requirements solver contract (docs/PROPOSAL_requirements_solver.md). Lives here so it is importable
+# from schema.result; schema.solver re-exports these for the engine/server call sites.
+# --------------------------------------------------------------------------------------------------
+
+
+class Requirement(BaseModel):
+    """The outcome a posture must meet. v1: a single protection tolerance."""
+
+    max_p90_armed_leakers: float = Field(
+        ge=0, description="90th-percentile armed leakers must be <= this."
+    )
+
+
+class LedgerLine(BaseModel):
+    """Per-effector logistics line: burn vs stock -> waves until that layer goes black."""
+
+    effector_id: str
+    consumable: bool
+    rounds_per_wave: float = Field(description="Mean rounds expended per wave (from MC).")
+    magazine: int
+    waves_until_black: Optional[float] = Field(
+        default=None,
+        description="floor(magazine / rounds_per_wave). None = reusable/unlimited; inf = no burn.",
+    )
+
+
+class CandidatePosture(BaseModel):
+    """A posture summary (no full trace) -- used for the frontier and best-achievable."""
+
+    label: str
+    defense: DefenseSpec
+    procurement_cost: float
+    feasible: bool
+    p90_armed_leakers: float
+    cost_exchange_median: float
+    waves_until_black: Optional[float] = Field(
+        default=None, description="Min over consumable layers; None if no consumable layer fielded."
+    )
+
+
+class SolverResult(BaseModel):
+    """The deliverable: cheapest feasible posture + the trade frontier + the gap if infeasible."""
+
+    objective: str = "minimize_procurement_cost"
+    requirement: Requirement
+    feasible: bool
+
+    recommended: Optional[CandidatePosture] = Field(default=None)
+    recommended_result: Optional[MonteCarloResult] = Field(default=None)
+    recommended_ledger: list[LedgerLine] = Field(default_factory=list)
+
+    best_achievable: CandidatePosture = Field(
+        description="Most-protective posture in the grid (always set, even when infeasible)."
+    )
+    binding_gap: Optional[float] = Field(
+        default=None, description="How far best_achievable sits above the tolerance (>0 => unmet)."
+    )
+
+    frontier: list[CandidatePosture] = Field(default_factory=list)
+    candidates_evaluated: int
+    base_seed: int
+    runs: int

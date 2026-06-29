@@ -13,9 +13,11 @@ import json
 from pathlib import Path
 
 from engine.montecarlo import DEFAULT_RUNS, run_montecarlo
+from engine.requirements import solve
 from engine.simulation import simulate
-from schema.loader import DEFAULT_SCENARIO_DIR, load_scenario, load_scenarios
+from schema.loader import DEFAULT_SCENARIO_DIR, load_effectors, load_scenario, load_scenarios
 from schema.result import MonteCarloResult, Result
+from schema.solver import Requirement, SolverResult
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT_DIR = ROOT / "outputs"
@@ -73,6 +75,47 @@ def _print_mc_summary(mc: MonteCarloResult) -> None:
     )
 
 
+def _print_solver(res: SolverResult) -> None:
+    if res.feasible and res.recommended is not None:
+        r = res.recommended
+        wub = "unlimited" if r.waves_until_black is None else f"{r.waves_until_black:.1f}"
+        _boxed(
+            [
+                f"REQUIREMENT met: p90 armed leakers <= {res.requirement.max_p90_armed_leakers:g}  "
+                f"({res.candidates_evaluated} postures, {res.runs} runs each)",
+                f"Recommended : {r.label}",
+                f"Procurement : {_fmt_money(r.procurement_cost)}  (consumable munitions stocked)",
+                f"Protection  : p90 armed {r.p90_armed_leakers:g} | cost-exchange {r.cost_exchange_median:.2f}x",
+                f"SUSTAINMENT : waves-until-black {wub}  (the logistics race headline)",
+            ]
+        )
+        print("  Ledger (burn vs stock):")
+        for ln in res.recommended_ledger:
+            if ln.consumable and ln.waves_until_black is not None:
+                print(
+                    f"    {ln.effector_id:<18} {ln.rounds_per_wave:5.1f} rounds/wave  "
+                    f"mag {ln.magazine:<4} -> {ln.waves_until_black:.2f} waves"
+                )
+            else:
+                print(f"    {ln.effector_id:<18} {ln.rounds_per_wave:5.1f} rounds/wave  (reusable)")
+    else:
+        b = res.best_achievable
+        _boxed(
+            [
+                f"REQUIREMENT UNMET: nothing in inventory holds this picture at p90 <= "
+                f"{res.requirement.max_p90_armed_leakers:g}",
+                f"Closest     : {b.label}",
+                f"Best p90    : {b.p90_armed_leakers:g} armed leakers  (gap {res.binding_gap:g})",
+                f"Implication : accept {b.p90_armed_leakers:g}, or acquire capability beyond this inventory",
+            ]
+        )
+
+    print("  Cost / protection frontier:")
+    for c in res.frontier:
+        mark = "  <- recommended" if (res.recommended and c.label == res.recommended.label) else ""
+        print(f"    {_fmt_money(c.procurement_cost):>12}  -> p90 armed {c.p90_armed_leakers:g}{mark}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Counter-swarm engagement sandbox (Phase 0).")
     parser.add_argument("scenario", nargs="?", help="Scenario name to run.")
@@ -90,6 +133,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Directory containing threats/effectors/scenarios YAML.",
     )
     parser.add_argument("--emit", action="store_true", help="Write the result JSON to outputs/.")
+    parser.add_argument(
+        "--requirements",
+        action="store_true",
+        help="Inverse-design: find the cheapest posture that meets a leak tolerance for this swarm.",
+    )
+    parser.add_argument(
+        "--max-leakers",
+        type=float,
+        default=2.0,
+        help="Requirements tolerance: max p90 armed leakers (default 2).",
+    )
     parser.add_argument(
         "--all",
         action="store_true",
@@ -120,6 +174,22 @@ def main(argv: list[str] | None = None) -> int:
     scenario = load_scenario(args.scenario, args.scenario_dir)
     if args.seed is not None:
         scenario = scenario.model_copy(update={"seed": args.seed})
+
+    if args.requirements:
+        catalog = load_effectors(Path(args.scenario_dir) / "effectors.yaml")
+        runs = args.runs if args.runs > 1 else DEFAULT_RUNS
+        res = solve(
+            scenario.swarm,
+            scenario.approach_distance,
+            Requirement(max_p90_armed_leakers=args.max_leakers),
+            catalog,
+            base_seed=scenario.seed,
+            runs=runs,
+        )
+        _print_solver(res)
+        if args.emit:
+            _emit(f"{args.scenario}.requirements.json", res.model_dump_json(indent=2))
+        return 0
 
     if args.runs > 1:
         mc = run_montecarlo(scenario, runs=args.runs)
