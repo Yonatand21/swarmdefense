@@ -197,7 +197,7 @@ function Column({
 
       {state.error && <div className="error small">{state.error}</div>}
       {state.result ? (
-        <ScenarioView mc={state.result} color={color} />
+        <ScenarioView mc={state.result} scenario={state.scenario} color={color} />
       ) : state.loading ? (
         <div className="loading">Running {state.runs} simulations…</div>
       ) : (
