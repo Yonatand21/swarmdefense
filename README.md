@@ -1,7 +1,7 @@
 # Counter-Swarm Sandbox
 
 A simulation sandbox that demonstrates a single thesis: **cost, saturation, and the speed of the
-kill chain — not lethality — decide the modern counter-drone fight.** Configure a layered defense,
+kill chain (not lethality) decide the modern counter-drone fight.** Configure a layered defense,
 throw a heterogeneous drone swarm at it, and measure what actually matters: leakers, cost-exchange,
 attrition, and how many waves your magazines can sustain.
 
@@ -20,7 +20,7 @@ cd swarmdefense
 ```
 
 `./run.sh` sets up the Python venv + deps and the frontend on first run, then launches the engine
-bridge and the dashboard together — open **http://localhost:5173**. Press Ctrl+C once to stop.
+bridge and the dashboard together; open **http://localhost:5173**. Press Ctrl+C once to stop.
 
 Prefer headless (no UI)? After `python3 -m venv .venv && source .venv/bin/activate &&
 pip install -e ".[dev,server]"`:
@@ -37,50 +37,52 @@ Full details and the demo walkthrough are in [§7](#7-run-it) and [§8](#8-demo-
 
 ## Writeup
 
-**What I built, and why this — what made it worth the 48 hours.**
+**What I built, and why this: what made it worth the 48 hours.**
 A deterministic counter-swarm *decision* sandbox: configure a layered defense, throw a heterogeneous
-swarm at it, and measure what actually decides the modern counter-drone fight — leakers,
+swarm at it, and measure what actually decides the modern counter-drone fight: leakers,
 cost-exchange, attrition, and sustainment (waves-until-black). Why this: the problem is widely
 *misframed* as lethality, when open-source reporting from Ukraine and the Red Sea shows defenders
-intercepting drones and still losing — on economics, on magazine depth, on a kill chain that's a
+intercepting drones and still losing on economics, on magazine depth, on a kill chain that's a
 probability stack, and on GPS-denied threats that ignore EW. Every one of those is something a
-*model* can express cleanly and a spec sheet cannot. It earned the 48 hours because the three-scenario
-contrast plus the inverse "requirements solver" make it genuinely useful for reasoning about
-posture — not a tech demo, a thinking tool. (Detail: [§1](#1-why-this--the-problem),
-[§3](#3-the-argument--three-canonical-scenarios), [§4](#4-the-requirements-solver--logistics-ledger).)
+*model* can express cleanly and a spec sheet cannot. It earned the 48 hours because the
+three-scenario contrast plus the inverse "requirements solver" make it genuinely useful for
+reasoning about posture: not a tech demo, a thinking tool. (Detail:
+[§1](#1-why-this-the-problem), [§3](#3-the-argument-three-canonical-scenarios),
+[§4](#4-the-requirements-solver--logistics-ledger).)
 
 **What I deliberately did not build, and how I kept it shippable.**
 Cut, on purpose: sensor physics (RCS/clutter/RF/IR), 3D/terrain/aerodynamics, learned (RL)
 adversaries, EW waveform modeling, and any database/auth/deployment. I kept it shippable with a
-*protected floor* and one hard rule — **one deterministic engine behind a validated contract**, with
+*protected floor* and one hard rule: **one deterministic engine behind a validated contract**, with
 the CLI, dashboard, replay, and solver as pure consumers that can't drift. The build was phased so
-each step is a complete deliverable on its own (engine → Monte Carlo analysis → dashboard → replay →
-inverse solver), and 45 fast tests (determinism, conservation, canonical validation, API, solver
-search logic) guard it. If the UI had slipped, the headless engine + validated outputs still stands
-alone. (Detail: [§5](#5-what-we-cut-and-why-the-conscious-trades).)
+each step is a complete deliverable on its own (engine, then Monte Carlo analysis, then dashboard,
+then replay, then inverse solver), and 45 fast tests (determinism, conservation, canonical
+validation, API, solver search logic) guard it. If the UI had slipped, the headless engine plus
+validated outputs still stands alone. (Detail:
+[§5](#5-what-we-cut-and-why-the-conscious-trades).)
 
 **What I'd do with another week.**
-In order: (1) a **provenance layer** — source, confidence, and as-of on every parameter, plus
-version stamps on every result — which turns illustrative numbers into auditable ones and is the
-bridge from sandbox to a tool an analyst trusts; (2) **war-stock / reprocurement-rate** modeling on
-top of the ledger, to capture the real logistics race (your regeneration curve vs the adversary's);
-(3) a **shot-allocation optimizer** behind the existing swappable policy seam; then decision-latency
+In order: (1) a **provenance layer** (source, confidence, and as-of on every parameter, plus version
+stamps on every result) that turns illustrative numbers into auditable ones and is the bridge from
+sandbox to a tool an analyst trusts; (2) **war-stock / reprocurement-rate** modeling on top of the
+ledger, to capture the real logistics race (your regeneration curve vs the adversary's); (3) a
+**shot-allocation optimizer** behind the existing swappable policy seam; then decision-latency
 modeling and ingesting a real inventory feed so the solver's recommendations become authoritative.
-None of these touch the simulation core — they're seams, not rewrites.
-(Detail: [§6](#6-where-it-goes--scalability).)
+None of these touch the simulation core; they're seams, not rewrites.
+(Detail: [§6](#6-where-it-goes-scalability).)
 
 ---
 
-## 1. Why this — the problem
+## 1. Why this: the problem
 
 Open-source reporting from Ukraine, the Red Sea, and Poland converges on a counter-intuitive lesson:
 **defenders can intercept drones and still lose.** The failure modes are structural, not technical:
 
-- **The cost-exchange trap.** A ~$20–30k attack drone draws an interceptor costing orders of
+- **The cost-exchange trap.** A ~$20-30k attack drone draws an interceptor costing orders of
   magnitude more. You can stop the swarm and still lose the economic exchange.
 - **Saturation / magazine depth.** Mass is the weapon. The decisive moment is the magazine running
   dry mid-wave, after which the rest of the swarm walks through.
-- **The kill chain is a probability stack.** detect → track → identify → defeat, each < 1. Multiply
+- **The kill chain is a probability stack.** detect, track, identify, defeat, each < 1. Multiply
   realistic values and leakers are arithmetic, not bugs.
 - **The GPS-denied / autonomous threat.** Drones on visual-inertial navigation ignore EW and emit no
   RF, so they're detected late and your cheap first line of defense does nothing.
@@ -89,7 +91,7 @@ Open-source reporting from Ukraine, the Red Sea, and Poland converges on a count
 
 A spec sheet can't express any of these. A *model* can. This sandbox lets you feel "stack your
 defense on EW and a GPS-denied swarm renders half your investment useless and arrives before you can
-react" — and then reason about which posture actually survives.
+react," then reason about which posture actually survives.
 
 ---
 
@@ -97,28 +99,28 @@ react" — and then reason about which posture actually survives.
 
 One deterministic simulation engine behind a validated contract, with several consumers:
 
-- **Engine** (`engine/`) — a seeded, discrete-time engagement loop: threats close on an asset,
+- **Engine** (`engine/`): a seeded, discrete-time engagement loop. Threats close on an asset,
   sensors detect them (a range gate), the defender allocates shots via a swappable policy, the
-  kill-chain stack decides outcomes, magazines deplete and reload, leakers are counted. Same seed →
-  byte-identical run.
-- **Monte Carlo** (`engine/montecarlo.py`) — one run lies; the distribution tells the truth. Runs a
+  kill-chain stack decides outcomes, magazines deplete and reload, leakers are counted. Same seed
+  yields a byte-identical run.
+- **Monte Carlo** (`engine/montecarlo.py`): one run lies; the distribution tells the truth. Runs a
   scenario hundreds of times and aggregates leakers, cost-exchange, attrition, magazine timeline, and
   per-effector consumption, plus the median-leaker run for replay.
-- **Metrics dashboard** (`frontend/`) — React + TypeScript: cost-exchange headline + verdict, leaker
+- **Metrics dashboard** (`frontend/`): React + TypeScript. Cost-exchange headline + verdict, leaker
   distribution, attrition curve, magazine timeline, and A/B scenario compare.
-- **Interactive mission builder** — compose a swarm and a defense loadout (simple knobs + an Advanced
+- **Interactive mission builder**: compose a swarm and a defense loadout (simple knobs + an Advanced
   panel for every field), hit **Run**, compare two postures. This is the operator loop.
-- **2D engagement replay** — a radar-scope animation of the representative run: threats closing,
-  detection waking up, shots, kills, leakers crossing the line.
-- **Requirements solver** (`engine/requirements.py`) — inverse design (see §4).
-- **Bridge** (`server.py`) — a thin localhost FastAPI process so the UI can compose and run live.
-  A stateless consumer of the same contract — no database, no deployment.
+- **2D engagement replay**: a radar-scope animation of the representative run, showing threats
+  closing, detection waking up, shots, kills, and leakers crossing the line.
+- **Requirements solver** (`engine/requirements.py`): inverse design (see §4).
+- **Bridge** (`server.py`): a thin localhost FastAPI process so the UI can compose and run live.
+  A stateless consumer of the same contract, with no database and no deployment.
 
 ---
 
-## 3. The argument — three canonical scenarios
+## 3. The argument: three canonical scenarios
 
-These three runs *are* the thesis. (500× Monte Carlo, seed 0.)
+These three runs *are* the thesis. (500x Monte Carlo, seed 0.)
 
 | Scenario | Median leakers | Armed | Cost-exchange | The lesson |
 |----------|---------------:|------:|--------------:|------------|
@@ -126,29 +128,29 @@ These three runs *are* the thesis. (500× Monte Carlo, seed 0.)
 | `kinetic_vs_mass_and_decoys` | 29 | 17 | **23.15x** | You win shots and lose the bank; the magazine runs dry and the back half of the wave walks through. |
 | `layered_mix` | 0 | 0 | **0.50x** | The sustainable answer: cheap layers absorb mass, expensive shots reserved for what needs them. |
 
-The all-EW row is the teaching moment: **the metrics only mean something as a set** — cost-exchange
-answers "at what price," leakers answer "did it work," neither is a verdict alone.
+The all-EW row is the teaching moment: **the metrics only mean something as a set.** Cost-exchange
+answers "at what price," leakers answer "did it work"; neither is a verdict alone.
 
 ---
 
 ## 4. The requirements solver + logistics ledger
 
-The simulator answers the *forward* question ("this defense vs this swarm → what happens?"). A
+The simulator answers the *forward* question ("this defense vs this swarm, what happens?"). A
 planner works it *backwards*: **"given this threat picture and a required outcome, what's the
-cheapest posture that meets it — and how long can it sustain?"**
+cheapest posture that meets it, and how long can it sustain?"**
 
 `solve()` brute-forces a **pre-registered** grid of procurable postures and returns the cheapest one
-meeting a leak tolerance, a **cost-vs-protection frontier**, and — when nothing works — the
+meeting a leak tolerance, a **cost-vs-protection frontier**, and (when nothing works) the
 **best-achievable posture + the gap** (a dead end becomes a requirement).
 
-The headline is the **logistics ledger — waves-until-black**: `magazine ÷ rounds-burned-per-wave` =
+The headline is the **logistics ledger, waves-until-black**: `magazine / rounds-burned-per-wave` =
 how many waves you survive before resupply. Cost-exchange is the snapshot; sustainment is the
 integral (the Red Sea / Ukraine lesson).
 
 Run it: `python cli.py layered_mix --requirements --max-leakers 2 --runs 500`. With the reservation
-trick *withheld* from the search, it independently rediscovers the layered posture (~$480k) — and
-shows it burns ~its whole magazine each wave (**waves-until-black ≈ 1.0**: adequate for one wave, on
-the edge of sustainment). The frontier ends near **$24M for the last leaker** — the cost-exchange
+trick *withheld* from the search, it independently rediscovers the layered posture (~$480k) and
+shows it burns ~its whole magazine each wave (**waves-until-black ~= 1.0**: adequate for one wave, on
+the edge of sustainment). The frontier ends near **$24M for the last leaker**: the cost-exchange
 trap, quantified.
 
 ---
@@ -167,15 +169,15 @@ Articulating the cut is part of the work. Each is a trade, not an omission:
   the waveform.*
 - **No database / auth / deployment.** A thin local bridge was added deliberately for the operator
   loop; persistence and scale are deferred.
-- **Numbers are order-of-magnitude from open sources** — illustrative, not precise or classified.
+- **Numbers are order-of-magnitude from open sources**: illustrative, not precise or classified.
 
 ---
 
-## 6. Where it goes — scalability
+## 6. Where it goes: scalability
 
 The discipline: **design the seams, defer the scale.**
 
-- **Baked in now:** the engine⇄consumer contract (swap/add frontends freely), data-driven
+- **Baked in now:** the engine/consumer contract (swap/add frontends freely), data-driven
   threats/effectors/scenarios, seeded determinism, a separated assignment policy, and the solver's
   injectable evaluator + inventory.
 - **The roadmap (falls straight out of the cuts):** provenance/versioning on every parameter (source,
@@ -186,13 +188,13 @@ The discipline: **design the seams, defer the scale.**
 
 The line this earns: *the engine is a standalone library behind a validated schema; every consumer
 (CLI, dashboard, bridge) only reads that contract; scaling means adding consumers or running the
-engine as a service — without ever touching the simulation logic.*
+engine as a service, without ever touching the simulation logic.*
 
 ---
 
 ## 7. Run it
 
-> Paste one command at a time. (Avoid trailing `# comments` — some shells treat `#` literally.)
+> Paste one command at a time. (Avoid trailing `# comments`; some shells treat `#` literally.)
 
 Setup:
 
@@ -201,7 +203,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,server]"
 ```
 
-Tests (fast: determinism, conservation, canonical, API, solver search logic — expect 45 passed, 3 skipped):
+Tests (fast: determinism, conservation, canonical, API, solver search logic; expect 45 passed, 3 skipped):
 
 ```bash
 pytest -q
@@ -215,13 +217,13 @@ python cli.py layered_mix --runs 500
 for s in all_ew_vs_autonomous kinetic_vs_mass_and_decoys layered_mix; do python cli.py "$s" --runs 500; echo; done
 ```
 
-Inverse design — cheapest posture meeting a leak tolerance, plus the logistics ledger:
+Inverse design (cheapest posture meeting a leak tolerance, plus the logistics ledger):
 
 ```bash
 python cli.py layered_mix --requirements --max-leakers 2 --runs 500
 ```
 
-### Interactive dashboard — one command
+### Interactive dashboard: one command
 
 ```bash
 ./run.sh
@@ -230,16 +232,16 @@ python cli.py layered_mix --requirements --max-leakers 2 --runs 500
 This sets up the venv + deps on first run, starts the engine bridge and the dashboard together, and
 opens on `http://localhost:5173`. Press Ctrl+C once to stop both.
 
-### Interactive dashboard — manual (two terminals)
+### Interactive dashboard: manual (two terminals)
 
-Terminal 1 — the engine bridge (serves `http://127.0.0.1:8000`):
+Terminal 1, the engine bridge (serves `http://127.0.0.1:8000`):
 
 ```bash
 source .venv/bin/activate
 python server.py
 ```
 
-Terminal 2 — the dashboard (opens `http://localhost:5173`):
+Terminal 2, the dashboard (opens `http://localhost:5173`):
 
 ```bash
 cd frontend
@@ -255,15 +257,15 @@ In the UI: pick a preset or compose your own swarm + defense, toggle **Advanced*
 ## 8. Demo walkthrough
 
 1. **The trap.** Open `all_ew_vs_autonomous`. Headline: cost-exchange `0.00x` (green!) but verdict
-   "Defense overwhelmed", 30 armed leakers. *"A great ratio and a total loss — cost-exchange alone
+   "Defense overwhelmed", 30 armed leakers. *"A great ratio and a total loss; cost-exchange alone
    lies."*
 2. **The bankruptcy.** A/B against `kinetic_vs_mass_and_decoys`: `23.15x`, magazine runs dry. *"You
    win the shots and lose the war economically."*
 3. **The answer.** Switch A to `layered_mix`: 0 armed leakers at `0.50x`, "Sustainable". Play the
-   engagement replay — EW thins the mass, interceptors hold the autonomous cluster.
+   engagement replay: EW thins the mass, interceptors hold the autonomous cluster.
 4. **The planner's question.** `python cli.py layered_mix --requirements --max-leakers 2 --runs 500`.
    It rediscovers the layered posture from a pre-registered grid, prices it, and exposes
-   **waves-until-black ≈ 1.0** — adequate for one wave, not a campaign.
+   **waves-until-black ~= 1.0**: adequate for one wave, not a campaign.
 
 ---
 
@@ -271,7 +273,7 @@ In the UI: pick a preset or compose your own swarm + defense, toggle **Advanced*
 
 ```
 engine/      pure simulation library (models, rng, assignment policy, step loop, Monte Carlo, requirements solver)
-schema/      the engine<->consumer contract (result.py) + YAML loader (with overrides) + solver re-exports
+schema/      the engine/consumer contract (result.py) + YAML loader (with overrides) + solver re-exports
 scenarios/   data-driven threats / effectors / scenarios
 cli.py       run a scenario / Monte Carlo / requirements solve; --all exports dashboard data
 server.py    thin localhost FastAPI bridge: /api/catalog, /api/run, /api/requirements
