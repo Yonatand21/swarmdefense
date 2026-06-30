@@ -24,6 +24,7 @@ from engine.models import (
     SwarmEntry,
 )
 from engine.montecarlo import DEFAULT_RUNS, run_montecarlo
+from schema.result import MonteCarloResult
 from schema.solver import (
     CandidatePosture,
     LedgerLine,
@@ -59,7 +60,11 @@ def system_waves_until_black(ledger: dict[str, float]) -> float:
 # The reservation trick (per-category `engages`) is deliberately NOT a decision variable in v1.
 # --------------------------------------------------------------------------------------------------
 
-GRID: dict[str, list[Optional[dict]]] = {
+# An Inventory maps an effector id -> the buy levels the search may field (None = not fielded).
+# Each non-None level is an override dict applied to the catalog archetype.
+Inventory = dict[str, list[Optional[dict]]]
+
+GRID: Inventory = {
     "ew": [None, {"max_simultaneous": 4}, {"max_simultaneous": 8}],
     "directed_energy": [None, {"max_simultaneous": 2}, {"max_simultaneous": 4}],
     "interceptor_drone": [
@@ -77,6 +82,10 @@ GRID: dict[str, list[Optional[dict]]] = {
 }
 
 DEFAULT_SENSOR = SensorSpec(p_track=0.95, p_identify=0.85)
+
+# Seed offset for the reseed robustness check -- larger than any plausible run count so the two
+# seeded Monte Carlo batches do not overlap.
+_RESEED_OFFSET = 1_000_000
 
 
 def is_consumable(spec: EffectorSpec) -> bool:
@@ -100,46 +109,65 @@ def solve(
     environment: Optional[Environment] = None,
     sensor: Optional[SensorSpec] = None,
     evaluator: Evaluator = run_montecarlo,
+    inventory: Optional[Inventory] = None,
+    reseed_check: bool = True,
 ) -> SolverResult:
     env = environment or Environment()
     sns = sensor or DEFAULT_SENSOR
+    inv = inventory if inventory is not None else GRID
+    tol = requirement.max_p90_armed_leakers
 
-    candidates: list[CandidatePosture] = []
-    for effectors in _enumerate_postures(effector_catalog):
+    def evaluate(effectors: list[EffectorSpec], seed: int):
         scenario = Scenario(
             name="candidate",
-            seed=base_seed,
+            seed=seed,
             approach_distance=approach_distance,
             swarm=swarm,
             defense=DefenseSpec(sensor=sns, effectors=effectors),
             environment=env,
         )
-        mc = evaluator(scenario, runs=runs, base_seed=base_seed)
-        candidates.append(_summarize(effectors, mc, requirement))
+        return evaluator(scenario, runs=runs, base_seed=seed)
 
-    tol = requirement.max_p90_armed_leakers
+    candidates: list[CandidatePosture] = []
+    posture_effectors: dict[str, list[EffectorSpec]] = {}
+    for effectors in _enumerate_postures(effector_catalog, inv):
+        cand = _summarize(effectors, evaluate(effectors, base_seed), requirement)
+        candidates.append(cand)
+        posture_effectors[cand.id] = effectors
+
+    if not candidates:
+        raise ValueError("Inventory produced no candidate postures.")
+
     feasible = [c for c in candidates if c.feasible]
     recommended = (
-        min(feasible, key=lambda c: (c.procurement_cost, c.p90_armed_leakers, c.label))
+        min(feasible, key=lambda c: (c.procurement_cost, c.p90_armed_leakers, c.id))
         if feasible
         else None
     )
-    best_achievable = min(candidates, key=lambda c: (c.p90_armed_leakers, c.procurement_cost, c.label))
-    binding_gap = max(0.0, best_achievable.p90_armed_leakers - tol)
+    best_achievable = min(candidates, key=lambda c: (c.p90_armed_leakers, c.procurement_cost, c.id))
+
+    binding_gap = (
+        None
+        if recommended is not None
+        else {"constraint": "p90_armed_leakers", "delta": best_achievable.p90_armed_leakers - tol}
+    )
 
     recommended_result = None
     recommended_ledger: list[LedgerLine] = []
+    robustness_flag = False
     if recommended is not None:
-        scenario = Scenario(
-            name="recommended",
-            seed=base_seed,
-            approach_distance=approach_distance,
-            swarm=swarm,
-            defense=recommended.defense,
-            environment=env,
-        )
-        recommended_result = evaluator(scenario, runs=runs, base_seed=base_seed)
-        recommended_ledger = _ledger(recommended.defense.effectors, recommended_result)
+        effectors = posture_effectors[recommended.id]
+        rec_eval = evaluate(effectors, base_seed)
+        recommended_ledger = _ledger(effectors, rec_eval)
+        # The contract embeds the full MC artifact (for replay/dashboard). A synthetic evaluator
+        # returns a duck-typed result that the solver reads but does not embed; store None then.
+        recommended_result = rec_eval if isinstance(rec_eval, MonteCarloResult) else None
+        if reseed_check:
+            reseed = evaluate(effectors, base_seed + _RESEED_OFFSET)
+            robustness_flag = reseed.p90_armed_leakers > tol
+    elif reseed_check:
+        reseed = evaluate(posture_effectors[best_achievable.id], base_seed + _RESEED_OFFSET)
+        robustness_flag = reseed.p90_armed_leakers <= tol
 
     return SolverResult(
         requirement=requirement,
@@ -149,6 +177,7 @@ def solve(
         recommended_ledger=recommended_ledger,
         best_achievable=best_achievable,
         binding_gap=binding_gap,
+        robustness_flag=robustness_flag,
         frontier=_pareto(candidates),
         candidates_evaluated=len(candidates),
         base_seed=base_seed,
@@ -156,11 +185,13 @@ def solve(
     )
 
 
-def _enumerate_postures(catalog: dict[str, EffectorSpec]) -> list[list[EffectorSpec]]:
-    """Expand the pre-registered grid into concrete effector loadouts (skipping the empty posture)."""
-    ids = [eid for eid in GRID if eid in catalog]
+def _enumerate_postures(
+    catalog: dict[str, EffectorSpec], inventory: Inventory
+) -> list[list[EffectorSpec]]:
+    """Expand the inventory into concrete effector loadouts (skipping the empty posture)."""
+    ids = [eid for eid in inventory if eid in catalog]
     postures: list[list[EffectorSpec]] = []
-    for combo in itertools.product(*(GRID[eid] for eid in ids)):
+    for combo in itertools.product(*(inventory[eid] for eid in ids)):
         effectors: list[EffectorSpec] = []
         for eid, override in zip(ids, combo):
             if override is None:
@@ -185,8 +216,10 @@ def _summarize(effectors, mc, requirement: Requirement) -> CandidatePosture:
         if ln.consumable and ln.waves_until_black is not None
     }
     system = system_waves_until_black(finite) if finite else None
+    label = _label(effectors)
     return CandidatePosture(
-        label=_label(effectors),
+        id=label,
+        label=label,
         defense=DefenseSpec(sensor=DEFAULT_SENSOR, effectors=effectors),
         procurement_cost=procurement_cost(effectors),
         feasible=p90_armed <= requirement.max_p90_armed_leakers,

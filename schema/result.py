@@ -247,6 +247,7 @@ class LedgerLine(BaseModel):
 class CandidatePosture(BaseModel):
     """A posture summary (no full trace) -- used for the frontier and best-achievable."""
 
+    id: str = Field(description="Stable identifier (== label) for tie-breaks / frontier.")
     label: str
     defense: DefenseSpec
     procurement_cost: float
@@ -272,8 +273,13 @@ class SolverResult(BaseModel):
     best_achievable: CandidatePosture = Field(
         description="Most-protective posture in the grid (always set, even when infeasible)."
     )
-    binding_gap: Optional[float] = Field(
-        default=None, description="How far best_achievable sits above the tolerance (>0 => unmet)."
+    binding_gap: Optional[dict] = Field(
+        default=None,
+        description="When infeasible: {'constraint': str, 'delta': float} (how far best misses).",
+    )
+    robustness_flag: bool = Field(
+        default=False,
+        description="True => the recommendation's feasibility verdict flipped on reseed (knife-edge).",
     )
 
     frontier: list[CandidatePosture] = Field(default_factory=list)

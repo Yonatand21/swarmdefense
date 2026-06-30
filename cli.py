@@ -89,6 +89,8 @@ def _print_solver(res: SolverResult) -> None:
                 f"SUSTAINMENT : waves-until-black {wub}  (the logistics race headline)",
             ]
         )
+        if res.robustness_flag:
+            print("  ! robustness: verdict flips on reseed (knife-edge) -- raise runs before trusting")
         print("  Ledger (burn vs stock):")
         for ln in res.recommended_ledger:
             if ln.consumable and ln.waves_until_black is not None:
@@ -105,7 +107,8 @@ def _print_solver(res: SolverResult) -> None:
                 f"REQUIREMENT UNMET: nothing in inventory holds this picture at p90 <= "
                 f"{res.requirement.max_p90_armed_leakers:g}",
                 f"Closest     : {b.label}",
-                f"Best p90    : {b.p90_armed_leakers:g} armed leakers  (gap {res.binding_gap:g})",
+                f"Best p90    : {b.p90_armed_leakers:g} armed leakers  "
+                f"(gap {res.binding_gap['delta']:g})",
                 f"Implication : accept {b.p90_armed_leakers:g}, or acquire capability beyond this inventory",
             ]
         )

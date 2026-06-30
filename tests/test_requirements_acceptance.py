@@ -69,4 +69,4 @@ def test_infeasible_returns_best_achievable_and_gap():
     assert not res.feasible
     assert res.recommended is None
     assert res.best_achievable is not None
-    assert res.binding_gap is not None and res.binding_gap > 0
+    assert res.binding_gap is not None and res.binding_gap["delta"] > 0
