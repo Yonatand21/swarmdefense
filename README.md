@@ -9,6 +9,32 @@ Full design rationale and roadmap: [`ARCHITECTURE_AND_PLAN.md`](ARCHITECTURE_AND
 
 ---
 
+## Quickstart
+
+**Requirements:** Python 3.11+, Node 18+, and git.
+
+```bash
+git clone https://github.com/Yonatand21/swarmdefense.git
+cd swarmdefense
+./run.sh
+```
+
+`./run.sh` sets up the Python venv + deps and the frontend on first run, then launches the engine
+bridge and the dashboard together — open **http://localhost:5173**. Press Ctrl+C once to stop.
+
+Prefer headless (no UI)? After `python3 -m venv .venv && source .venv/bin/activate &&
+pip install -e ".[dev,server]"`:
+
+```bash
+pytest -q                 # 45 passed, 3 skipped
+python cli.py --list      # the three canonical scenarios
+python cli.py layered_mix --runs 500
+```
+
+Full details and the demo walkthrough are in [§7](#7-run-it) and [§8](#8-demo-walkthrough).
+
+---
+
 ## 1. Why this — the problem
 
 Open-source reporting from Ukraine, the Red Sea, and Poland converges on a counter-intuitive lesson:
@@ -190,7 +216,7 @@ In the UI: pick a preset or compose your own swarm + defense, toggle **Advanced*
 
 ---
 
-## 8. Demo walkthrough (the 3-minute narrative)
+## 8. Demo walkthrough
 
 1. **The trap.** Open `all_ew_vs_autonomous`. Headline: cost-exchange `0.00x` (green!) but verdict
    "Defense overwhelmed", 30 armed leakers. *"A great ratio and a total loss — cost-exchange alone
