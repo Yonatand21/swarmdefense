@@ -35,6 +35,42 @@ Full details and the demo walkthrough are in [§7](#7-run-it) and [§8](#8-demo-
 
 ---
 
+## Writeup
+
+**What I built, and why this — what made it worth the 48 hours.**
+A deterministic counter-swarm *decision* sandbox: configure a layered defense, throw a heterogeneous
+swarm at it, and measure what actually decides the modern counter-drone fight — leakers,
+cost-exchange, attrition, and sustainment (waves-until-black). Why this: the problem is widely
+*misframed* as lethality, when open-source reporting from Ukraine and the Red Sea shows defenders
+intercepting drones and still losing — on economics, on magazine depth, on a kill chain that's a
+probability stack, and on GPS-denied threats that ignore EW. Every one of those is something a
+*model* can express cleanly and a spec sheet cannot. It earned the 48 hours because the three-scenario
+contrast plus the inverse "requirements solver" make it genuinely useful for reasoning about
+posture — not a tech demo, a thinking tool. (Detail: [§1](#1-why-this--the-problem),
+[§3](#3-the-argument--three-canonical-scenarios), [§4](#4-the-requirements-solver--logistics-ledger).)
+
+**What I deliberately did not build, and how I kept it shippable.**
+Cut, on purpose: sensor physics (RCS/clutter/RF/IR), 3D/terrain/aerodynamics, learned (RL)
+adversaries, EW waveform modeling, and any database/auth/deployment. I kept it shippable with a
+*protected floor* and one hard rule — **one deterministic engine behind a validated contract**, with
+the CLI, dashboard, replay, and solver as pure consumers that can't drift. The build was phased so
+each step is a complete deliverable on its own (engine → Monte Carlo analysis → dashboard → replay →
+inverse solver), and 45 fast tests (determinism, conservation, canonical validation, API, solver
+search logic) guard it. If the UI had slipped, the headless engine + validated outputs still stands
+alone. (Detail: [§5](#5-what-we-cut-and-why-the-conscious-trades).)
+
+**What I'd do with another week.**
+In order: (1) a **provenance layer** — source, confidence, and as-of on every parameter, plus
+version stamps on every result — which turns illustrative numbers into auditable ones and is the
+bridge from sandbox to a tool an analyst trusts; (2) **war-stock / reprocurement-rate** modeling on
+top of the ledger, to capture the real logistics race (your regeneration curve vs the adversary's);
+(3) a **shot-allocation optimizer** behind the existing swappable policy seam; then decision-latency
+modeling and ingesting a real inventory feed so the solver's recommendations become authoritative.
+None of these touch the simulation core — they're seams, not rewrites.
+(Detail: [§6](#6-where-it-goes--scalability).)
+
+---
+
 ## 1. Why this — the problem
 
 Open-source reporting from Ukraine, the Red Sea, and Poland converges on a counter-intuitive lesson:
