@@ -159,7 +159,16 @@ Inverse design — cheapest posture meeting a leak tolerance, plus the logistics
 python cli.py layered_mix --requirements --max-leakers 2 --runs 500
 ```
 
-### Interactive dashboard (two terminals)
+### Interactive dashboard — one command
+
+```bash
+./run.sh
+```
+
+This sets up the venv + deps on first run, starts the engine bridge and the dashboard together, and
+opens on `http://localhost:5173`. Press Ctrl+C once to stop both.
+
+### Interactive dashboard — manual (two terminals)
 
 Terminal 1 — the engine bridge (serves `http://127.0.0.1:8000`):
 
